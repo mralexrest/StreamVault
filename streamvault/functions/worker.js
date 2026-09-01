@@ -2,6 +2,7 @@
 
 import { onRequestGet as sessionGet, onRequestPost as sessionPost } from './api/session.js';
 import { onRequestGet as healthGet } from './api/health.js';
+import { onRequestGet as accountsGet } from './api/accounts.js';
 
 export default {
   async fetch(request, env, ctx) {
@@ -14,6 +15,10 @@ export default {
     if (url.pathname === '/api/session') {
       if (request.method === 'GET') return sessionGet({ request, env, ctx });
       if (request.method === 'POST') return sessionPost({ request, env, ctx });
+      return new Response('Method not allowed', { status: 405 });
+    }
+    if (url.pathname === '/api/accounts') {
+      if (request.method === 'GET') return accountsGet({ request, env, ctx });
       return new Response('Method not allowed', { status: 405 });
     }
 

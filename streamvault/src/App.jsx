@@ -997,7 +997,9 @@ function AccountPicker({ onPick }) {
   async function load() {
     setLoading(true); setErr("");
     try {
-      const res = await fetch(`${CATALOG_API}/accounts`);
+      // Same-origin Pages Function — keeps the API key server-side and the
+      // request behind Cloudflare Access (see functions/api/accounts.js)
+      const res = await fetch("/api/accounts");
       if (res.status === 503) { setHidden(true); return; }  // not set up — hide silently
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();

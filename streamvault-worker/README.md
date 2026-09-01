@@ -43,9 +43,14 @@ All routes from `stalker-proxy` plus:
 
 ### `GET /accounts`
 
-Relays your Xtream account database so the frontend's account picker can fill in
-credentials. The Worker fetches `SV_ACCOUNTS_URL` with an `X-SV-Key: $SV_API_KEY`
-header, so the key stays server-side and never reaches the browser.
+Relays your Xtream account database. The Worker fetches `SV_ACCOUNTS_URL` with an
+`X-SV-Key: $SV_API_KEY` header, so the key stays server-side and never reaches
+the browser.
+
+> **The frontend no longer calls this route.** It uses the same-origin Pages
+> Function at `/api/accounts` (`streamvault/functions/api/accounts.js`) instead,
+> which sits behind the site's Cloudflare Access login. This route is kept for
+> compatibility and is unauthenticated — see the note below.
 
 | Condition | Response |
 |-----------|----------|
