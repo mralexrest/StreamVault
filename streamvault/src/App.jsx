@@ -970,12 +970,29 @@ function Player({ item, channelList, epgData, onClose, onFav, isFav, connType })
 // ══════════════════════════════════════════════════════════════════
 // ACCOUNT PICKER — saved Xtream accounts relayed by the Worker
 // ══════════════════════════════════════════════════════════════════
+const ACCOUNT_ROW_LIMIT = 50; // lists can run to tens of thousands — render a page at a time
+
 function AccountPicker({ onPick }) {
   const [open, setOpen]         = useState(false);
   const [accounts, setAccounts] = useState(null); // null = not fetched yet
   const [loading, setLoading]   = useState(false);
   const [err, setErr]           = useState("");
   const [hidden, setHidden]     = useState(false); // 503 — feature not configured
+  const [query, setQuery]       = useState("");
+
+  // Pre-lowercase each account once so filtering stays cheap on every keystroke
+  const indexed = useMemo(() => (accounts || []).map(a => ({
+    a, s: `${a.label||""} ${a.server||""} ${a.username||""} ${a.status||""}`.toLowerCase(),
+  })), [accounts]);
+
+  const matches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return indexed;
+    const terms = q.split(/\s+/);
+    return indexed.filter(r => terms.every(t => r.s.includes(t)));
+  }, [indexed, query]);
+
+  const shown = matches.slice(0, ACCOUNT_ROW_LIMIT);
 
   async function load() {
     setLoading(true); setErr("");
@@ -1008,6 +1025,9 @@ function AccountPicker({ onPick }) {
         onMouseLeave={e=>e.currentTarget.style.borderColor="var(--b2)"}>
         <span style={{fontSize:".9rem"}}>👤</span>
         <span style={{flex:1,textAlign:"left",fontWeight:500}}>My Accounts</span>
+        {accounts?.length > 0 && (
+          <span style={{fontSize:".65rem",color:"var(--t3)"}}>{accounts.length.toLocaleString()}</span>
+        )}
         <span style={{fontSize:".7rem",color:"var(--accent)",fontWeight:600}}>{open ? "▾" : "▸"}</span>
       </button>
 
@@ -1028,9 +1048,19 @@ function AccountPicker({ onPick }) {
           {!loading && !err && accounts?.length === 0 && (
             <div style={{fontSize:".76rem",color:"var(--t3)",padding:".5rem .7rem"}}>No accounts found.</div>
           )}
-          {!loading && !err && accounts?.length > 0 && (
-            <div style={{display:"flex",flexDirection:"column",gap:".35rem",maxHeight:"210px",overflowY:"auto"}}>
-              {accounts.map((a, i) => {
+          {!loading && !err && accounts?.length > 0 && (<>
+            {accounts.length > 8 && (
+              <input className="fi" autoFocus value={query} onChange={e=>setQuery(e.target.value)}
+                placeholder={`Search ${accounts.length.toLocaleString()} accounts — host, username or status`}
+                style={{fontSize:".76rem",padding:".45rem .65rem",marginBottom:".35rem"}} />
+            )}
+            {matches.length === 0 ? (
+              <div style={{fontSize:".76rem",color:"var(--t3)",padding:".5rem .7rem"}}>
+                No accounts match “{query.trim()}”.
+              </div>
+            ) : (
+            <div style={{display:"flex",flexDirection:"column",gap:".35rem",maxHeight:"240px",overflowY:"auto"}}>
+              {shown.map(({ a }, i) => {
                 const active = String(a.status||"").toLowerCase() === "active";
                 return (
                   <div key={i} style={{display:"flex",alignItems:"center",gap:".55rem",padding:".45rem .65rem",
@@ -1053,7 +1083,13 @@ function AccountPicker({ onPick }) {
                 );
               })}
             </div>
-          )}
+            )}
+            {matches.length > shown.length && (
+              <div style={{fontSize:".65rem",color:"var(--t3)",padding:".4rem .7rem 0"}}>
+                Showing {shown.length} of {matches.length.toLocaleString()} matches — keep typing to narrow.
+              </div>
+            )}
+          </>)}
         </div>
       )}
     </div>

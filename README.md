@@ -18,6 +18,7 @@ Supports **Xtream Codes**, **M3U playlists**, **Stalker/Ministra portals**, and 
 | **Global Search** | Searches live, movies, and series simultaneously |
 | **Favorites** | Per-profile favorites across all content types |
 | **Continue Watching** | Watch history with resume support (last 60 items) |
+| **Saved Accounts** | Searchable picker on the Xtream tab — fills credentials from your own account database |
 | **Themes** | Dark, Navy, AMOLED, Forest |
 | **Player** | HLS.js + mpegts.js, keyboard shortcuts, PiP, OSD overlay |
 | **Offline-ready** | IndexedDB caching — channels/categories persist across sessions |
@@ -203,9 +204,59 @@ Set `VITE_CATALOG_URL` in your frontend to the Worker URL.
 |----------|--------|-------------|
 | `/stream` | GET | Proxy HTTP streams over HTTPS with HLS manifest rewriting |
 | `/proxy` | GET | Generic CORS proxy for any URL |
+| `/accounts` | GET | Saved Xtream accounts, relayed from your account database (CF Worker only) |
 | `/health` | GET | Health check |
 
 All endpoints return JSON with CORS headers (`Access-Control-Allow-Origin: *`).
+
+---
+
+## Saved accounts (optional)
+
+If you keep your Xtream accounts in your own database, the Worker can relay them
+to the app so you can pick one instead of typing credentials every time.
+
+**How it works** — the browser calls the Worker, the Worker calls your database
+with an API key, and returns the list. The key lives only in the Worker, so it
+never reaches the browser:
+
+```
+Browser → CF Worker /accounts → your account API (X-SV-Key header) → JSON list
+```
+
+**Setup**
+
+```bash
+cd streamvault-worker
+wrangler secret put SV_API_KEY      # API key for your account database
+# Upstream URL is the SV_ACCOUNTS_URL var in wrangler.toml
+wrangler deploy
+```
+
+Your endpoint should return a JSON array. `label` is what the list shows;
+`server`, `username` and `password` are what get filled in:
+
+```json
+[
+  { "label": "serverhost.com:80", "server": "http://serverhost.com:80",
+    "username": "myuser", "password": "mypass", "status": "Active" }
+]
+```
+
+**In the app** — a **My Accounts** section appears above the Xtream Codes
+credential fields. Expand it to load the list, search by host, username or
+status (multiple words all have to match), and click an account to fill in
+Server URL, Username and Password. A green dot means `Active`, grey means
+anything else. Lists are rendered 50 rows at a time, so tens of thousands of
+accounts stay responsive.
+
+The picker is entirely optional: it hides itself if the Worker returns 503
+(no `SV_API_KEY` set), falls back to a "Could not load accounts" note if the
+fetch fails, and the manual fields always keep working.
+
+> The list is served without authentication, so anyone who can reach your
+> Worker URL can read these credentials. Keep the Worker URL private, or add an
+> auth check to the route.
 
 ---
 
