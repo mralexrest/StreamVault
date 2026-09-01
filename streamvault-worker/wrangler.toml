@@ -2,6 +2,11 @@ name = "streamvault-worker"
 main = "src/index.js"
 compatibility_date = "2024-12-01"
 
+# Upstream Xtream account database (relayed by GET /accounts).
+# The matching API key is a secret: wrangler secret put SV_API_KEY
+[vars]
+SV_ACCOUNTS_URL = "https://x-stream-checker.vercel.app/api/sv/accounts"
+
 # KV namespace for Stalker session/path caching
 # Create with: wrangler kv namespace create SV_CACHE
 [[kv_namespaces]]

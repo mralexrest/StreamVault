@@ -13,6 +13,10 @@ wrangler d1 create streamvault-db
 # Run database migrations
 wrangler d1 migrations apply streamvault-db
 
+# API key for the upstream account database used by GET /accounts
+# (the URL itself is the SV_ACCOUNTS_URL var in wrangler.toml)
+wrangler secret put SV_API_KEY
+
 # Local dev
 npm run dev
 
@@ -27,6 +31,7 @@ All routes from `stalker-proxy` plus:
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/stalker/play` | GET | Resolve + stream in one request (same IP) |
+| `/accounts` | GET | Xtream account list, relayed from the account database |
 | `/api/catalog/connections` | PUT/GET/DELETE | Persistent connection storage |
 | `/api/catalog/content` | PUT/GET/DELETE | Content item storage |
 | `/api/catalog/categories` | PUT/GET | Category storage |
