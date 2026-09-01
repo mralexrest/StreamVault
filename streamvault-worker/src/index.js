@@ -9,6 +9,7 @@ import {
 } from "./handlers/stalker.js";
 import { handleStream, handleStreamHead } from "./handlers/stream.js";
 import { handleProxy } from "./handlers/proxy.js";
+import { handleAccounts } from "./handlers/accounts.js";
 import { handleCleanup } from "./handlers/cleanup.js";
 import { handleAnalytics, handleDashboardHTML } from "./handlers/analytics.js";
 import {
@@ -62,6 +63,11 @@ export default {
     // ── Generic CORS proxy (Xtream API, M3U fetches)
     if (pathname === "/proxy" && method === "GET") {
       return handleProxy(url);
+    }
+
+    // ── Xtream account list (relayed from the Vercel account database)
+    if (pathname === "/accounts" && method === "GET") {
+      return handleAccounts(env);
     }
 
     // ── Catalog API (persistent D1 storage)
