@@ -18,6 +18,7 @@ Supports **Xtream Codes**, **M3U playlists**, **Stalker/Ministra portals**, and 
 | **Global Search** | Searches live, movies, and series simultaneously |
 | **Favorites** | Per-profile favorites across all content types |
 | **Continue Watching** | Watch history with resume support (last 60 items) |
+| **Saved Accounts** | Searchable picker on the Xtream tab — fills credentials from your own account database |
 | **Themes** | Dark, Navy, AMOLED, Forest |
 | **Player** | HLS.js + mpegts.js, keyboard shortcuts, PiP, OSD overlay |
 | **Offline-ready** | IndexedDB caching — channels/categories persist across sessions |
@@ -59,7 +60,9 @@ You can run **either** the stalker-proxy (simple) **or** the CF Worker (full-fea
 StreamVault/
 ├── streamvault/              # React + Vite frontend
 │   ├── src/App.jsx           # Entire app (single-file architecture)
-│   ├── functions/worker.js   # CF Pages stream proxy (legacy)
+│   ├── functions/
+│   │   ├── worker.js         # Entrypoint — routes /api/* and /stream, else static assets
+│   │   └── api/              # session, health, accounts (server-side, same origin)
 │   └── .env.example
 ├── stalker-proxy/            # Node.js CORS proxy
 │   ├── src/index.js          # Express server
@@ -203,9 +206,68 @@ Set `VITE_CATALOG_URL` in your frontend to the Worker URL.
 |----------|--------|-------------|
 | `/stream` | GET | Proxy HTTP streams over HTTPS with HLS manifest rewriting |
 | `/proxy` | GET | Generic CORS proxy for any URL |
+| `/accounts` | GET | Saved Xtream accounts relay (CF Worker only — superseded by the Pages Function below) |
 | `/health` | GET | Health check |
 
 All endpoints return JSON with CORS headers (`Access-Control-Allow-Origin: *`).
+
+---
+
+## Saved accounts (optional)
+
+If you keep your Xtream accounts in your own database, the Worker can relay them
+to the app so you can pick one instead of typing credentials every time.
+
+**How it works** — the browser calls a Pages Function on its own origin, which
+calls your database with an API key and returns the list. The key lives only in
+the Pages environment, so it never reaches the browser:
+
+```
+Browser → /api/accounts (Pages Function) → your account API (X-SV-Key header) → JSON list
+```
+
+Because the Function is same-origin, it sits behind whatever protects the site
+itself — put the Pages deployment behind [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/)
+and the account list is covered by the same login, with no CORS involved.
+
+**Setup** — add two variables to the Pages project
+(*Settings → Environment variables*), then redeploy:
+
+| Variable | Type | Value |
+|----------|------|-------|
+| `SV_API_KEY` | Secret | API key for your account database |
+| `SV_ACCOUNTS_URL` | Plaintext | Upstream URL (optional — defaults to the Vercel endpoint) |
+
+> Do **not** prefix these with `VITE_`. Vite inlines `VITE_*` variables into the
+> JavaScript bundle at build time; these are read server-side by the Function
+> and must stay out of the bundle.
+
+Your endpoint should return a JSON array. `label` is what the list shows;
+`server`, `username` and `password` are what get filled in:
+
+```json
+[
+  { "label": "serverhost.com:80", "server": "http://serverhost.com:80",
+    "username": "myuser", "password": "mypass", "status": "Active" }
+]
+```
+
+**In the app** — a **My Accounts** section appears above the Xtream Codes
+credential fields. Expand it to load the list, search by host, username or
+status (multiple words all have to match), and click an account to fill in
+Server URL, Username and Password. A green dot means `Active`, grey means
+anything else. Lists are rendered 50 rows at a time, so tens of thousands of
+accounts stay responsive.
+
+The picker is entirely optional: it hides itself on a 503 (no `SV_API_KEY` set),
+falls back to a "Could not load accounts" note if the fetch fails, and the manual
+fields always keep working.
+
+> The CF Worker also has an `/accounts` route that does the same relay, kept for
+> compatibility. The frontend no longer calls it, and unlike the Pages Function
+> it is **not** behind Access — anyone who knows the Worker URL can read the
+> list from it. Remove the route, or put the Worker behind Access too, if that
+> matters to you.
 
 ---
 

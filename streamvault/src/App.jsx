@@ -968,6 +968,137 @@ function Player({ item, channelList, epgData, onClose, onFav, isFav, connType })
 }
 
 // ══════════════════════════════════════════════════════════════════
+// ACCOUNT PICKER — saved Xtream accounts relayed by the Worker
+// ══════════════════════════════════════════════════════════════════
+const ACCOUNT_ROW_LIMIT = 50; // lists can run to tens of thousands — render a page at a time
+
+function AccountPicker({ onPick }) {
+  const [open, setOpen]         = useState(false);
+  const [accounts, setAccounts] = useState(null); // null = not fetched yet
+  const [loading, setLoading]   = useState(false);
+  const [err, setErr]           = useState("");
+  const [hidden, setHidden]     = useState(false); // 503 — feature not configured
+  const [query, setQuery]       = useState("");
+
+  // Pre-lowercase each account once so filtering stays cheap on every keystroke
+  const indexed = useMemo(() => (accounts || []).map(a => ({
+    a, s: `${a.label||""} ${a.server||""} ${a.username||""} ${a.status||""}`.toLowerCase(),
+  })), [accounts]);
+
+  const matches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return indexed;
+    const terms = q.split(/\s+/);
+    return indexed.filter(r => terms.every(t => r.s.includes(t)));
+  }, [indexed, query]);
+
+  const shown = matches.slice(0, ACCOUNT_ROW_LIMIT);
+
+  async function load() {
+    setLoading(true); setErr("");
+    try {
+      // Same-origin Pages Function — keeps the API key server-side and the
+      // request behind Cloudflare Access (see functions/api/accounts.js)
+      const res = await fetch("/api/accounts");
+      if (res.status === 503) { setHidden(true); return; }  // not set up — hide silently
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (!Array.isArray(data)) throw new Error("Unexpected response");
+      setAccounts(data);
+    } catch { setErr("Could not load accounts"); }
+    finally { setLoading(false); }
+  }
+
+  function toggle() {
+    const next = !open;
+    setOpen(next);
+    if (next && accounts === null && !loading) load();
+  }
+
+  if (hidden) return null;
+
+  return (
+    <div style={{marginBottom:"1rem"}}>
+      <button type="button" onClick={toggle}
+        style={{width:"100%",display:"flex",alignItems:"center",gap:".5rem",padding:".55rem .7rem",
+          background:"var(--s2)",border:"1px solid var(--b2)",borderRadius:"8px",cursor:"pointer",
+          color:"var(--t1)",fontFamily:"'DM Sans',sans-serif",fontSize:".78rem",transition:"all .2s"}}
+        onMouseEnter={e=>e.currentTarget.style.borderColor="var(--accent)"}
+        onMouseLeave={e=>e.currentTarget.style.borderColor="var(--b2)"}>
+        <span style={{fontSize:".9rem"}}>👤</span>
+        <span style={{flex:1,textAlign:"left",fontWeight:500}}>My Accounts</span>
+        {accounts?.length > 0 && (
+          <span style={{fontSize:".65rem",color:"var(--t3)"}}>{accounts.length.toLocaleString()}</span>
+        )}
+        <span style={{fontSize:".7rem",color:"var(--accent)",fontWeight:600}}>{open ? "▾" : "▸"}</span>
+      </button>
+
+      {open && (
+        <div style={{marginTop:".45rem"}}>
+          {loading && (
+            <div style={{display:"flex",alignItems:"center",gap:".55rem",padding:".55rem .7rem",
+              fontSize:".78rem",color:"var(--t2)"}}>
+              <div className="spinner" style={{width:14,height:14,borderWidth:2}} />
+              <span>Loading accounts…</span>
+            </div>
+          )}
+          {!loading && err && (
+            <div style={{fontSize:".76rem",color:"var(--t3)",padding:".5rem .7rem"}}>
+              {err} — enter your details manually below.
+            </div>
+          )}
+          {!loading && !err && accounts?.length === 0 && (
+            <div style={{fontSize:".76rem",color:"var(--t3)",padding:".5rem .7rem"}}>No accounts found.</div>
+          )}
+          {!loading && !err && accounts?.length > 0 && (<>
+            {accounts.length > 8 && (
+              <input className="fi" autoFocus value={query} onChange={e=>setQuery(e.target.value)}
+                placeholder={`Search ${accounts.length.toLocaleString()} accounts — host, username or status`}
+                style={{fontSize:".76rem",padding:".45rem .65rem",marginBottom:".35rem"}} />
+            )}
+            {matches.length === 0 ? (
+              <div style={{fontSize:".76rem",color:"var(--t3)",padding:".5rem .7rem"}}>
+                No accounts match “{query.trim()}”.
+              </div>
+            ) : (
+            <div style={{display:"flex",flexDirection:"column",gap:".35rem",maxHeight:"240px",overflowY:"auto"}}>
+              {shown.map(({ a }, i) => {
+                const active = String(a.status||"").toLowerCase() === "active";
+                return (
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:".55rem",padding:".45rem .65rem",
+                    background:"var(--s2)",border:"1px solid var(--b2)",borderRadius:"8px",cursor:"pointer",transition:"all .2s"}}
+                    onClick={() => onPick(a)}
+                    onMouseEnter={e=>e.currentTarget.style.borderColor="var(--accent)"}
+                    onMouseLeave={e=>e.currentTarget.style.borderColor="var(--b2)"}>
+                    <span title={a.status || "Unknown"} style={{width:8,height:8,borderRadius:"50%",flexShrink:0,
+                      background: active ? "var(--ok)" : "var(--t3)"}} />
+                    <div style={{flex:1,overflow:"hidden"}}>
+                      <div style={{fontSize:".78rem",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                        {a.label || a.server}
+                      </div>
+                      <div style={{fontSize:".62rem",color:"var(--t3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                        {a.username}{a.status ? ` · ${a.status}` : ""}
+                      </div>
+                    </div>
+                    <span style={{fontSize:".65rem",color:"var(--t3)"}}>Click to fill →</span>
+                  </div>
+                );
+              })}
+            </div>
+            )}
+            {matches.length > shown.length && (
+              <div style={{fontSize:".65rem",color:"var(--t3)",padding:".4rem .7rem 0"}}>
+                Showing {shown.length} of {matches.length.toLocaleString()} matches — keep typing to narrow.
+              </div>
+            )}
+          </>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════
 // SETUP
 // ══════════════════════════════════════════════════════════════════
 function Setup({ onConnect, connections = [], onReconnect }) {
@@ -1225,6 +1356,12 @@ function Setup({ onConnect, connections = [], onReconnect }) {
           ))}
         </div>
         {type==="xtream" && (<>
+          <AccountPicker onPick={a => {
+            if (a.server) set("server", a.server.replace(/\/$/,""));
+            if (a.username) set("user", a.username);
+            if (a.password) set("pass", a.password);
+            setErr("");
+          }} />
           <div className="fg"><label className="fl">Server URL</label>
             <input className="fi" placeholder="http://server.com:8080" value={f.server} onChange={e=>set("server",e.target.value)} /></div>
           <div className="fg"><label className="fl">Username</label>

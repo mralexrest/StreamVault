@@ -41,6 +41,34 @@ All routes from `stalker-proxy` plus:
 | `/api/analytics` | GET | Usage stats |
 | `/analytics` | GET | Dashboard HTML |
 
+### `GET /accounts`
+
+Relays your Xtream account database. The Worker fetches `SV_ACCOUNTS_URL` with an
+`X-SV-Key: $SV_API_KEY` header, so the key stays server-side and never reaches
+the browser.
+
+> **The frontend no longer calls this route.** It uses the same-origin Pages
+> Function at `/api/accounts` (`streamvault/functions/api/accounts.js`) instead,
+> which sits behind the site's Cloudflare Access login. This route is kept for
+> compatibility and is unauthenticated — see the note below.
+
+| Condition | Response |
+|-----------|----------|
+| Upstream 200 | The upstream JSON array, verbatim |
+| `SV_API_KEY` unset | `503 {"error":"not configured"}` — the picker hides itself |
+| Upstream 401/error, or unreachable | `502 {"error":"account fetch failed"}` |
+
+Upstream error details are never passed through. Configure with:
+
+```bash
+wrangler secret put SV_API_KEY     # secret — not in wrangler.toml
+# SV_ACCOUNTS_URL is a [vars] entry in wrangler.toml
+```
+
+Note: the route itself is unauthenticated — anyone who can reach the Worker URL
+can read the list. Add a guard (e.g. the `X-Guest-Id` check the catalog routes
+use) if that matters to you.
+
 ## D1 Schema
 
 Migrations in `migrations/`:
