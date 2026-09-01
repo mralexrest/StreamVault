@@ -206,7 +206,6 @@ Set `VITE_CATALOG_URL` in your frontend to the Worker URL.
 |----------|--------|-------------|
 | `/stream` | GET | Proxy HTTP streams over HTTPS with HLS manifest rewriting |
 | `/proxy` | GET | Generic CORS proxy for any URL |
-| `/accounts` | GET | Saved Xtream accounts relay (CF Worker only — superseded by the Pages Function below) |
 | `/health` | GET | Health check |
 
 All endpoints return JSON with CORS headers (`Access-Control-Allow-Origin: *`).
@@ -215,8 +214,8 @@ All endpoints return JSON with CORS headers (`Access-Control-Allow-Origin: *`).
 
 ## Saved accounts (optional)
 
-If you keep your Xtream accounts in your own database, the Worker can relay them
-to the app so you can pick one instead of typing credentials every time.
+If you keep your Xtream accounts in your own database, the app can relay them
+so you can pick one instead of typing credentials every time.
 
 **How it works** — the browser calls a Pages Function on its own origin, which
 calls your database with an API key and returns the list. The key lives only in
@@ -263,11 +262,9 @@ The picker is entirely optional: it hides itself on a 503 (no `SV_API_KEY` set),
 falls back to a "Could not load accounts" note if the fetch fails, and the manual
 fields always keep working.
 
-> The CF Worker also has an `/accounts` route that does the same relay, kept for
-> compatibility. The frontend no longer calls it, and unlike the Pages Function
-> it is **not** behind Access — anyone who knows the Worker URL can read the
-> list from it. Remove the route, or put the Worker behind Access too, if that
-> matters to you.
+> The CF Worker used to expose the same relay at `/accounts`. That route has been
+> removed: it was not behind Access, so anyone who knew the Worker URL could read
+> the list. The Pages Function is now the only path to your account database.
 
 ---
 
